@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Turn-based Chess-like Game</title>
+    <style>
+        /* Basic styles for the game board */
+        #board {
+            display: grid;
+            grid-template-columns: repeat(5, 60px);
+            grid-template-rows: repeat(5, 60px);
+            gap: 1px;
+            margin: 20px auto;
+            max-width: 305px;
+        }
+        .cell {
+            width: 60px;
+            height: 60px;
+            background-color: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            border: 1px solid #ccc;
+        }
+        .cell:nth-child(odd) {
+            background-color: #e0e0e0;
+        }
+        .cell.selected {
+            background-color: #c0c0c0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Turn-based Chess-like Game</h1>
+    <div id="board"></div>
+    <button id="startGame">Start Game</button>
+    <button id="resetGame">Reset Game</button>
+
+    <script>
+        const ws = new WebSocket('ws://localhost:8080');
+        const boardElement = document.getElementById('board');
+        let selectedCell = null;
+        const playerId = 'player1';  // Change as needed or make dynamic
+
+        // Create the 5x5 grid
+        for (let i = 0; i < 25; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.dataset.index = i;
+            cell.addEventListener('click', () => handleCellClick(i));
+            boardElement.appendChild(cell);
+        }
+
+        ws.onopen = () => {
+            console.log('Connected to WebSocket server');
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            console.log('Game state:', data);
+            updateBoard(data);
+        };
+
+        ws.onclose = () => {
+            console.log('Disconnected from WebSocket server');
+        };
+
+        document.getElementById('startGame').onclick = () => {
+            const initialSetup = {
+                playerId: playerId,
+                initialSetup: [] // Define initial positions here
+            };
+            ws.send(JSON.stringify({ type: 'initialize', ...initialSetup }));
+        };
+
+        document.getElementById('resetGame').onclick = () => {
+            // Optionally reset the game
+            ws.send(JSON.stringify({ type: 'reset' }));
+            // Optional: You might want to clear the board or reset the UI here
+        };
+
+        function handleCellClick(index) {
+            if (selectedCell === null) {
+                selectedCell = index;
+                document.querySelectorAll('.cell').forEach(cell => cell.classList.remove('selected'));
+                document.querySelector(`.cell[data-index="${index}"]`).classList.add('selected');
+            } else {
+                const move = { from: selectedCell, to: index };
+                ws.send(JSON.stringify({ type: 'move', playerId: playerId, move: move }));
+                selectedCell = null;
+                document.querySelectorAll('.cell').forEach(cell => cell.classList.remove('selected'));
+            }
+        }
+
+        function updateBoard(gameState) {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => cell.textContent = '');
+            gameState.board.flat().forEach((cell, index) => {
+                if (cell) {
+                    cells[index].textContent = cell;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
